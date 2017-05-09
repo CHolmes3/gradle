@@ -16,9 +16,6 @@
 
 package org.gradle.internal.logging.console;
 
-import com.google.common.base.Function;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Sets;
 import org.gradle.internal.logging.events.BatchOutputEventListener;
 import org.gradle.internal.logging.events.EndOutputEvent;
 import org.gradle.internal.logging.events.OperationIdentifier;
@@ -31,9 +28,7 @@ import org.gradle.internal.logging.events.ProgressStartEvent;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 public class WorkInProgressRenderer extends BatchOutputEventListener {
     private final OutputEventListener listener;
@@ -81,35 +76,8 @@ public class WorkInProgressRenderer extends BatchOutputEventListener {
 
     @Override
     public void onOutput(Iterable<OutputEvent> events) {
-        Set<OperationIdentifier> completeEventOperationIds = toOperationIdSet(toProgressCompleteEvents(events));
-        Set<OperationIdentifier> startEventOperationIdsToSkip = new HashSet<OperationIdentifier>();
-
-        for (OutputEvent event : events) {
-            if (event instanceof ProgressStartEvent && completeEventOperationIds.contains(((ProgressStartEvent) event).getProgressOperationId())) {
-                startEventOperationIdsToSkip.add(((ProgressStartEvent) event).getProgressOperationId());
-                listener.onOutput(event);
-            } else if (event instanceof ProgressCompleteEvent && startEventOperationIdsToSkip.contains(((ProgressCompleteEvent) event).getProgressOperationId())) {
-                listener.onOutput(event);
-            } else {
-                onOutput(event);
-            }
-        }
+        super.onOutput(events);
         renderNow();
-    }
-
-    // Filters the events for ProgressCompleteEvent only.
-    private Iterable<ProgressCompleteEvent> toProgressCompleteEvents(Iterable<OutputEvent> events) {
-        return Iterables.filter(events, ProgressCompleteEvent.class);
-    }
-
-    // Transform ProgressCompleteEvent into their corresponding progress OperationIdentifier.
-    private Set<OperationIdentifier> toOperationIdSet(Iterable<ProgressCompleteEvent> events) {
-        return Sets.newHashSet(Iterables.transform(events, new Function<ProgressCompleteEvent, OperationIdentifier>() {
-            @Override
-            public OperationIdentifier apply(ProgressCompleteEvent event) {
-                return event.getProgressOperationId();
-            }
-        }));
     }
 
     private void resizeTo(int newBuildProgressLabelCount) {
@@ -139,10 +107,6 @@ public class WorkInProgressRenderer extends BatchOutputEventListener {
             detach(operation.getParent().getOperationId());
         }
 
-        if (!isRenderable(operation)) {
-            return;
-        }
-
         // No more unused label? Try to resize.
         if (unusedProgressLabels.isEmpty()) {
             int newValue = operationIdToAssignedLabels.size() + 1;
@@ -163,10 +127,6 @@ public class WorkInProgressRenderer extends BatchOutputEventListener {
     }
 
     private void detach(ProgressOperation operation) {
-        if (!isRenderable(operation)) {
-            return;
-        }
-
         detach(operation.getOperationId());
         unassignedProgressOperations.remove(operation);
 
@@ -182,19 +142,6 @@ public class WorkInProgressRenderer extends BatchOutputEventListener {
         if (association != null) {
             unusedProgressLabels.push(association.label);
         }
-    }
-
-    // Any ProgressOperation in the parent chain has a message, the operation is considered renderable.
-    private boolean isRenderable(ProgressOperation operation) {
-        for (ProgressOperation current = operation;
-             current != null && !BuildStatusRenderer.BUILD_PROGRESS_CATEGORY.equals(current.getCategory());
-             current = current.getParent()) {
-            if (current.getMessage() != null) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private void renderNow() {

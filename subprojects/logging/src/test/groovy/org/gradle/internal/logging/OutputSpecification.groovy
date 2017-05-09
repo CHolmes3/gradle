@@ -76,23 +76,14 @@ abstract class OutputSpecification extends Specification {
         start(description: description)
     }
 
-    ProgressStartEvent start(Long id) {
-        start(id: id)
-    }
-
-    ProgressStartEvent start(Long id, String status) {
-        start(id: id, status: status)
-    }
-
     ProgressStartEvent start(Map args) {
-        Long parentId = args.containsKey("parentId") ? args.parentId : counter
-        OperationIdentifier parent = parentId ? new OperationIdentifier(parentId) : null
+        OperationIdentifier parentId = args.containsKey("parentId") ? args.parentId : new OperationIdentifier(counter)
         Object buildOperationId = args.containsKey("buildOperationId") ? args.buildOperationId : null
         Object parentBuildOperationId = args.containsKey("parentBuildOperationId") ? args.parentBuildOperationId : null
         BuildOperationType buildOperationType = args.containsKey("buildOperationType") ? args.buildOperationType : BuildOperationType.UNCATEGORIZED
-        Long id = args.containsKey("id") ? args.id : ++counter
+        long id = ++counter
         String category = args.containsKey("category") ? args.category : CATEGORY
-        return new ProgressStartEvent(new OperationIdentifier(id), parent, tenAm, category, args.description, args.shortDescription, args.loggingHeader, args.status, buildOperationId, parentBuildOperationId, buildOperationType)
+        return new ProgressStartEvent(new OperationIdentifier(id), parentId, tenAm, category, args.description, args.shortDescription, args.loggingHeader, args.status, buildOperationId, parentBuildOperationId, buildOperationType)
     }
 
     ProgressEvent progress(String status) {
@@ -103,9 +94,5 @@ abstract class OutputSpecification extends Specification {
     ProgressCompleteEvent complete(String status) {
         long id = counter--
         return new ProgressCompleteEvent(new OperationIdentifier(id), tenAm, CATEGORY, 'description', status)
-    }
-
-    ProgressCompleteEvent complete(Long id, category='CATEGORY', description='DESCRIPTION', status='STATUS') {
-        new ProgressCompleteEvent(new OperationIdentifier(id), tenAm, category, description, status)
     }
 }
