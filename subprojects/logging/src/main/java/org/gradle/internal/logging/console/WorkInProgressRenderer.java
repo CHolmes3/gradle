@@ -51,9 +51,6 @@ public class WorkInProgressRenderer extends BatchOutputEventListener {
     // Track any progress operation that either can't be display due to label shortage or child progress operation is already been displayed
     private final Deque<ProgressOperation> unassignedProgressOperations = new ArrayDeque<ProgressOperation>();
 
-    // Track the parent-children relation between progress operation to avoid displaying a parent when children are been displayed
-    private final ParentRegistry registry = new ParentRegistry();
-
     public WorkInProgressRenderer(OutputEventListener listener, BuildProgressArea progressArea, DefaultWorkInProgressFormatter labelFormatter, ConsoleLayoutCalculator consoleLayoutCalculator) {
         this.listener = listener;
         this.progressArea = progressArea;
@@ -133,13 +130,12 @@ public class WorkInProgressRenderer extends BatchOutputEventListener {
 
     private void attach(ProgressOperation operation) {
         // Skip attach if a children is already present
-        if (registry.find(operation.getOperationId()).hasChildren()) {
+        if (!operation.getChildren().isEmpty()) {
             return;
         }
 
         // Reuse parent label if possible
         if (operation.getParent() != null) {
-            registry.find(operation.getParent().getOperationId()).add(operation.getOperationId());
             detach(operation.getParent().getOperationId());
         }
 
@@ -167,10 +163,6 @@ public class WorkInProgressRenderer extends BatchOutputEventListener {
     }
 
     private void detach(ProgressOperation operation) {
-        if (operation.getParent() != null) {
-            registry.find(operation.getParent().getOperationId()).remove(operation.getOperationId());
-        }
-
         if (!isRenderable(operation)) {
             return;
         }
@@ -195,7 +187,7 @@ public class WorkInProgressRenderer extends BatchOutputEventListener {
     // Any ProgressOperation in the parent chain has a message, the operation is considered renderable.
     private boolean isRenderable(ProgressOperation operation) {
         for (ProgressOperation current = operation;
-             current != null && !"org.gradle.internal.progress.BuildProgressLogger".equals(current.getCategory());
+             current != null && !BuildStatusRenderer.BUILD_PROGRESS_CATEGORY.equals(current.getCategory());
              current = current.getParent()) {
             if (current.getMessage() != null) {
                 return true;
@@ -225,50 +217,6 @@ public class WorkInProgressRenderer extends BatchOutputEventListener {
 
         void renderNow() {
             label.setText(labelFormatter.format(operation));
-        }
-    }
-
-    private static class ParentRegistry {
-        private final Map<OperationIdentifier, Set<OperationIdentifier>> parentIdToChildrenIds = new HashMap<OperationIdentifier, Set<OperationIdentifier>>();
-
-        public ChildrenRegistry find(final OperationIdentifier parentId) {
-            return new ChildrenRegistry() {
-                @Override
-                public void add(OperationIdentifier childId) {
-                    Set<OperationIdentifier> children = parentIdToChildrenIds.get(parentId);
-                    if (children == null) {
-                        children = new HashSet<OperationIdentifier>();
-                        parentIdToChildrenIds.put(parentId, children);
-                    }
-                    children.add(childId);
-                }
-
-                @Override
-                public void remove(OperationIdentifier childId) {
-                    Set<OperationIdentifier> children = parentIdToChildrenIds.get(parentId);
-                    if (children == null) {
-                        return;
-                    }
-                    children.remove(childId);
-                    if (children.isEmpty()) {
-                        parentIdToChildrenIds.remove(parentId);
-                    }
-                }
-
-                @Override
-                public boolean hasChildren() {
-                    Set<OperationIdentifier> children = parentIdToChildrenIds.get(parentId);
-                    return children != null && !children.isEmpty();
-                }
-            };
-        }
-
-        public interface ChildrenRegistry {
-            void add(OperationIdentifier childId);
-
-            void remove(OperationIdentifier childId);
-
-            boolean hasChildren();
         }
     }
 }
