@@ -205,19 +205,19 @@ class ConsoleFunctionalTest extends Specification {
         renderer.onOutput(startEvent(6, ':nope'))
 
         then:
-        progressArea.buildProgressLabelCount == metaData.rows / 2
         ConcurrentTestUtil.poll(1) {
             assert progressArea.display == ['> :wat', '> :foo', '> :bar', '> :baz', '> :foz']
         }
+        progressArea.buildProgressLabelCount == metaData.rows / 2
 
         when:
         renderer.onOutput(completeEvent(1, ':wat'))
 
         then:
-        progressArea.buildProgressLabelCount == metaData.rows / 2
         ConcurrentTestUtil.poll(1) {
             assert progressArea.display == ['> :nope', '> :foo', '> :bar', '> :baz', '> :foz']
         }
+        progressArea.buildProgressLabelCount == metaData.rows / 2
     }
 
     def "progress display height scales when more work in progress are added"() {
